@@ -1,0 +1,52 @@
+@page "/"
+@inject HttpClient Http
+<PageTitle>SuperHero Search</PageTitle>
+<h1>SuperHero Search</h1>
+<p class="intro">Busque por heróis e vilões usando a API oficial do SuperHero.</p>
+<form @onsubmit="SearchHeroes" @onsubmit:preventDefault>
+    <label for="token">Token de acesso</label>
+    <input id="token" type="password" @bind="accessToken" required />
+    <label for="search">Nome do personagem</label>
+    <div class="search"><input id="search" placeholder="Batman" @bind="searchTerm" required /><button disabled="@isLoading">Pesquisar</button></div>
+</form>
+@if (isLoading) { <p role="status">Carregando...</p> }
+@if (!string.IsNullOrEmpty(errorMessage)) { <p class="error" role="alert">@errorMessage</p> }
+@if (heroes.Count > 0)
+{
+    <div class="cards">
+    @foreach (var hero in heroes)
+    {
+        <article>
+            <img src="@hero.Image.Url" alt="@hero.Name" />
+            <section><h2>@hero.Name <small>(@hero.Biography.FullName)</small></h2>
+            <p>Editora: @hero.Biography.Publisher</p><hr />
+            <h3>POWERSTATS</h3>
+            <p>Inteligência: @hero.Powerstats.Intelligence<br />Força: @hero.Powerstats.Strength<br />Velocidade: @hero.Powerstats.Speed<br />Combate: @hero.Powerstats.Combat</p>
+            <h3>APARIÇÃO</h3><p>@hero.Biography.FirstAppearance</p></section>
+        </article>
+    }
+    </div>
+}
+else if (hasSearched && !isLoading && string.IsNullOrEmpty(errorMessage)) { <p>Nenhum personagem encontrado.</p> }
+@code {
+    private string searchTerm = string.Empty;
+    private string accessToken = string.Empty;
+    private string errorMessage = string.Empty;
+    private List<SuperHero> heroes = new();
+    private bool isLoading, hasSearched;
+    private async Task SearchHeroes()
+    {
+        if (isLoading || string.IsNullOrWhiteSpace(searchTerm) || string.IsNullOrWhiteSpace(accessToken)) return;
+        isLoading = true; hasSearched = true; errorMessage = string.Empty; heroes = new();
+        try
+        {
+            var url = $"https://www.superheroapi.com/api.php/{Uri.EscapeDataString(accessToken.Trim())}/search/{Uri.EscapeDataString(searchTerm.Trim())}";
+            var result = await Http.GetFromJsonAsync<SuperHeroResponse>(url);
+            if (result?.Response == "success") heroes = result.Results ?? new();
+            else if (result?.Error?.Contains("not found", StringComparison.OrdinalIgnoreCase) != true)
+                errorMessage = "A API não retornou resultados válidos. Confira o token e o nome do personagem.";
+        }
+        catch (Exception) { errorMessage = "Erro ao conectar com a API. Confira a conexão, o token e as permissões CORS."; }
+        finally { isLoading = false; }
+    }
+}
